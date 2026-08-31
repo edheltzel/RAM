@@ -12,6 +12,7 @@ final class Store {
     var popupOpen = false
     var listView: ListView = .process
     var filter = ""
+    var filterRevealed = false
     var expanded: Set<String> = []
     var activityMonitorNote: String?
     var forceQuitTarget: Proc?
@@ -36,6 +37,7 @@ final class Store {
         popupOpen = true
         listView = .process
         filter = ""
+        filterRevealed = false
         expanded = []
         activityMonitorNote = nil
         forceQuitTarget = nil
@@ -43,6 +45,7 @@ final class Store {
         refreshMemory()
         refreshProcesses()
         startPopupTimer()
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     func popupDisappeared() {
@@ -55,7 +58,12 @@ final class Store {
         forceQuitTarget = nil
         selectedProcessPid = nil
         filter = ""
+        filterRevealed = false
         popoverWindow = nil
+    }
+
+    func revealFilter() {
+        filterRevealed = true
     }
 
     func cycleView() {
@@ -155,8 +163,9 @@ final class Store {
             return event
         }
         if event.keyCode == 53 { // escape
-            if !filter.isEmpty {
+            if !filter.isEmpty || filterRevealed {
                 filter = ""
+                filterRevealed = false
                 return nil
             }
             if selectedProcessPid != nil {
@@ -178,6 +187,7 @@ final class Store {
         }
         if ch.isLetter || ch.isNumber || ch == " " || ch == "-" || ch == "." || ch == "_" {
             filter.append(ch)
+            filterRevealed = true
             selectedProcessPid = nil
             return nil
         }

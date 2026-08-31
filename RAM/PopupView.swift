@@ -19,6 +19,7 @@ struct PopupView: View {
         .background {
             WindowAccessor { window in
                 store.popoverWindow = window
+                window?.makeKey()
             }
         }
         .frame(width: 300)
@@ -111,17 +112,33 @@ struct PopupView: View {
 
     private var processHeader: some View {
         VStack(alignment: .leading, spacing: 6) {
-            sectionTitle("TOP PROCESSES")
-            HStack {
-                Button(store.listView.rawValue) {
+            HStack(spacing: 8) {
+                sectionTitle("TOP PROCESSES")
+                Button {
                     store.cycleView()
+                } label: {
+                    HStack(spacing: 3) {
+                        Text(store.listView.rawValue)
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.system(size: 8, weight: .semibold))
+                    }
                 }
-                .buttonStyle(MenuActionStyle())
+                .buttonStyle(.bordered)
                 .controlSize(.mini)
                 .help("View cycles App → Process → Nested → Session → Workload")
-                Spacer()
+                .accessibilityLabel("Group by \(store.listView.rawValue)")
+
+                Button {
+                    store.revealFilter()
+                } label: {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 11, weight: .medium))
+                }
+                .buttonStyle(.plain)
+                .help("Filter processes")
+                .accessibilityLabel("Filter processes")
             }
-            if !store.filter.isEmpty {
+            if store.filterRevealed || !store.filter.isEmpty {
                 filterField
             }
             HStack {
