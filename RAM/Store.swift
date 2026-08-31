@@ -11,6 +11,7 @@ final class Store {
     var processes: [Proc] = []
     var popupOpen = false
     var listView: ListView = .nested
+    var sortDescending = true
     var filter = ""
     var filterRevealed = false
     var expanded: Set<String> = []
@@ -31,6 +32,9 @@ final class Store {
         if let raw = UserDefaults.standard.string(forKey: "ram.listView"),
            let saved = ListView(rawValue: raw) {
             listView = saved
+        }
+        if UserDefaults.standard.object(forKey: "ram.sortDescending") != nil {
+            sortDescending = UserDefaults.standard.bool(forKey: "ram.sortDescending")
         }
         refreshMemory()
         startChipTimer()
@@ -100,6 +104,11 @@ final class Store {
         selectedProcessPid = nil
         forceQuitTarget = nil
         UserDefaults.standard.set(listView.rawValue, forKey: "ram.listView")
+    }
+
+    func toggleSort() {
+        sortDescending.toggle()
+        UserDefaults.standard.set(sortDescending, forKey: "ram.sortDescending")
     }
 
     func toggleExpanded(_ id: String) {
@@ -224,7 +233,7 @@ final class Store {
     }
 
     var rows: [ListRow] {
-        Grouping.rows(view: listView, processes: processes, filter: filter, expanded: expanded)
+        Grouping.rows(view: listView, processes: processes, filter: filter, expanded: expanded, sortDescending: sortDescending)
     }
 
     private func startChipTimer() {

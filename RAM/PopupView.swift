@@ -143,7 +143,19 @@ struct PopupView: View {
             HStack {
                 Text("Process")
                 Spacer()
-                Text("Usage")
+                Button {
+                    store.toggleSort()
+                } label: {
+                    HStack(spacing: 2) {
+                        Text("Usage")
+                        Image(systemName: store.sortDescending ? "chevron.down" : "chevron.up")
+                            .font(.system(size: 7, weight: .semibold))
+                    }
+                }
+                .buttonStyle(.plain)
+                .help(store.sortDescending ? "Highest memory first" : "Lowest memory first")
+                .accessibilityLabel("Usage")
+                .accessibilityValue(store.sortDescending ? "Descending" : "Ascending")
             }
             .font(.system(size: 10, weight: .medium))
             .foregroundStyle(.secondary)

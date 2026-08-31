@@ -8,20 +8,33 @@ enum Grouping {
         view: ListView,
         processes: [Proc],
         filter: String,
-        expanded: Set<String>
+        expanded: Set<String>,
+        sortDescending: Bool
     ) -> [ListRow] {
         switch view {
         case .process:
-            return cap(filterRows(processes.map(processRow), filter: filter))
+            return cap(filterRows(sortedRows(processes.map(processRow), descending: sortDescending), filter: filter))
         case .app:
-            return cap(filterRows(appRows(processes, nested: false, expanded: []), filter: filter))
+            return cap(filterRows(appRows(processes, nested: false, expanded: [], sortDescending: sortDescending), filter: filter))
         case .nested:
-            return nestedVisible(appRows(processes, nested: true, expanded: expanded), filter: filter)
+            return nestedVisible(appRows(processes, nested: true, expanded: expanded, sortDescending: sortDescending), filter: filter)
         case .session:
-            return cap(filterRows(sessionRows(processes), filter: filter))
+            return cap(filterRows(sessionRows(processes, sortDescending: sortDescending), filter: filter))
         case .workload:
-            return cap(filterRows(workloadRows(processes), filter: filter))
+            return cap(filterRows(workloadRows(processes, sortDescending: sortDescending), filter: filter))
         }
+    }
+
+    private static func memoryBefore(_ a: UInt64, _ b: UInt64, descending: Bool) -> Bool {
+        descending ? a > b : a < b
+    }
+
+    private static func sortedRows(_ rows: [ListRow], descending: Bool) -> [ListRow] {
+        rows.sorted { memoryBefore($0.bytes, $1.bytes, descending: descending) }
+    }
+
+    private static func sortedProcs(_ procs: [Proc], descending: Bool) -> [Proc] {
+        procs.sorted { memoryBefore($0.bytes, $1.bytes, descending: descending) }
     }
 
     private static func processRow(_ proc: Proc) -> ListRow {
@@ -40,7 +53,7 @@ enum Grouping {
     /// GUI apps collapse by bundle: two Brave windows = one Brave. A process only joins an
     /// app row if its executable lives inside that app's bundle. Terminal.app is summed that
     /// way; shells and coding agents hosted *in* a terminal stay separate process rows.
-    private static func appRows(_ processes: [Proc], nested: Bool, expanded: Set<String>) -> [ListRow] {
+    private static func appRows(_ processes: [Proc], nested: Bool, expanded: Set<String>, sortDescending: Bool) -> [ListRow] {
         let gui = NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular }
         var claimed = Set<Int32>()
         var rows: [ListRow] = []
@@ -64,7 +77,7 @@ enum Grouping {
                     depth: 0,
                     expandable: nested,
                     expanded: nested && expanded.contains(id),
-                    children: members.sorted { $0.bytes > $1.bytes }
+                    children: sortedProcs(members, descending: sortDescending)
                 )
             )
         }
@@ -72,7 +85,7 @@ enum Grouping {
         for proc in processes where !claimed.contains(proc.pid) {
             rows.append(processRow(proc))
         }
-        return rows.sorted { $0.bytes > $1.bytes }
+        return sortedRows(rows, descending: sortDescending)
     }
 
     private static func nestedVisible(_ parents: [ListRow], filter: String) -> [ListRow] {
@@ -113,7 +126,7 @@ enum Grouping {
     ///    Ghostty, Warp, Alacritty, kitty, WezTerm) or Cursor's `pty-host`; that ancestor pid is
     ///    the session key.
     /// 4. Remaining GUI helpers stay with their owning app pid; leftover daemons are their own pid.
-    private static func sessionRows(_ processes: [Proc]) -> [ListRow] {
+    private static func sessionRows(_ processes: [Proc], sortDescending: Bool) -> [ListRow] {
         let byPid = Dictionary(uniqueKeysWithValues: processes.map { ($0.pid, $0) })
         var sessionKey: [Int32: String] = [:]
 
@@ -159,7 +172,7 @@ enum Grouping {
         }
 
         return buckets.map { key, members in
-            let sorted = members.sorted { $0.bytes > $1.bytes }
+            let sorted = sortedProcs(members, descending: sortDescending)
             let title = sessionTitle(key: key, members: sorted)
             return ListRow(
                 id: "sess:\(key)",
@@ -172,7 +185,7 @@ enum Grouping {
                 children: sorted
             )
         }
-        .sorted { $0.bytes > $1.bytes }
+        .sorted { memoryBefore($0.bytes, $1.bytes, descending: sortDescending) }
     }
 
     private static func sessionTitle(key: String, members: [Proc]) -> String {
@@ -208,7 +221,7 @@ enum Grouping {
         return false
     }
 
-    private static func workloadRows(_ processes: [Proc]) -> [ListRow] {
+    private static func workloadRows(_ processes: [Proc], sortDescending: Bool) -> [ListRow] {
         var buckets: [WorkloadKind: [Proc]] = [:]
         for proc in processes {
             let comm = URL(fileURLWithPath: proc.path).lastPathComponent
@@ -226,10 +239,10 @@ enum Grouping {
                 depth: 0,
                 expandable: false,
                 expanded: false,
-                children: members.sorted { $0.bytes > $1.bytes }
+                children: sortedProcs(members, descending: sortDescending)
             )
         }
-        .sorted { $0.bytes > $1.bytes }
+        .sorted { memoryBefore($0.bytes, $1.bytes, descending: sortDescending) }
     }
 
     private static func filterRows(_ rows: [ListRow], filter: String) -> [ListRow] {
