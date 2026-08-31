@@ -14,14 +14,8 @@ enum Grouping {
         switch view {
         case .process:
             return cap(filterRows(sortedRows(processes.map(processRow), descending: sortDescending), filter: filter))
-        case .app:
-            return cap(filterRows(appRows(processes, nested: false, expanded: [], sortDescending: sortDescending), filter: filter))
         case .nested:
             return nestedVisible(appRows(processes, nested: true, expanded: expanded, sortDescending: sortDescending), filter: filter)
-        case .session:
-            return cap(filterRows(sessionRows(processes, sortDescending: sortDescending), filter: filter))
-        case .workload:
-            return cap(filterRows(workloadRows(processes, sortDescending: sortDescending), filter: filter))
         }
     }
 
@@ -117,132 +111,6 @@ enum Grouping {
             }
         }
         return out
-    }
-
-    /// Session grouping, best-effort, no TCC:
-    /// 1. Processes that share a controlling TTY (`proc_bsdinfo.pbi_tdev != 0`) are one session.
-    /// 2. If a process has no TTY, walk `ppid` until an ancestor with a TTY is found and inherit it.
-    /// 3. If still none, walk `ppid` until a known terminal-emulator bundle (Terminal, iTerm2,
-    ///    Ghostty, Warp, Alacritty, kitty, WezTerm) or Cursor's `pty-host`; that ancestor pid is
-    ///    the session key.
-    /// 4. Remaining GUI helpers stay with their owning app pid; leftover daemons are their own pid.
-    private static func sessionRows(_ processes: [Proc], sortDescending: Bool) -> [ListRow] {
-        let byPid = Dictionary(uniqueKeysWithValues: processes.map { ($0.pid, $0) })
-        var sessionKey: [Int32: String] = [:]
-
-        func key(for proc: Proc, seen: Set<Int32> = []) -> String {
-            if let cached = sessionKey[proc.pid] { return cached }
-            if seen.contains(proc.pid) { return "pid:\(proc.pid)" }
-            var seen = seen
-            seen.insert(proc.pid)
-
-            if proc.ttyDev != 0 {
-                let k = "tty:\(proc.ttyDev)"
-                sessionKey[proc.pid] = k
-                return k
-            }
-            if let parent = byPid[proc.ppid] {
-                if parent.ttyDev != 0 {
-                    let k = "tty:\(parent.ttyDev)"
-                    sessionKey[proc.pid] = k
-                    return k
-                }
-                if isTerminalEmulator(parent) {
-                    let k = "term:\(parent.pid)"
-                    sessionKey[proc.pid] = k
-                    return k
-                }
-                let k = key(for: parent, seen: seen)
-                sessionKey[proc.pid] = k
-                return k
-            }
-            if isTerminalEmulator(proc) {
-                let k = "term:\(proc.pid)"
-                sessionKey[proc.pid] = k
-                return k
-            }
-            let k = "pid:\(proc.pid)"
-            sessionKey[proc.pid] = k
-            return k
-        }
-
-        var buckets: [String: [Proc]] = [:]
-        for proc in processes {
-            buckets[key(for: proc), default: []].append(proc)
-        }
-
-        return buckets.map { key, members in
-            let sorted = sortedProcs(members, descending: sortDescending)
-            let title = sessionTitle(key: key, members: sorted)
-            return ListRow(
-                id: "sess:\(key)",
-                title: title,
-                bytes: members.reduce(0) { $0 + $1.bytes },
-                kind: .group,
-                depth: 0,
-                expandable: false,
-                expanded: false,
-                children: sorted
-            )
-        }
-        .sorted { memoryBefore($0.bytes, $1.bytes, descending: sortDescending) }
-    }
-
-    private static func sessionTitle(key: String, members: [Proc]) -> String {
-        if let emulator = members.first(where: isTerminalEmulator) {
-            return emulator.displayName
-        }
-        if key.hasPrefix("tty:"), let head = members.first {
-            return "TTY · \(head.displayName)"
-        }
-        if members.count == 1 { return members[0].displayName }
-        return members[0].displayName + " +\(members.count - 1)"
-    }
-
-    private static let terminalBundleIDs: Set<String> = [
-        "com.apple.Terminal",
-        "com.googlecode.iterm2",
-        "com.mitchellh.ghostty",
-        "dev.warp.Warp-Stable",
-        "dev.warp.Warp",
-        "io.alacritty",
-        "net.kovidgoyal.kitty",
-        "com.github.wez.wezterm",
-    ]
-
-    private static func isTerminalEmulator(_ proc: Proc) -> Bool {
-        if let bid = proc.bundleIdentifier, terminalBundleIDs.contains(bid) { return true }
-        let base = URL(fileURLWithPath: proc.path).lastPathComponent.lowercased()
-        if ["terminal", "iterm2", "ghostty", "warp", "alacritty", "kitty", "wezterm"].contains(base) {
-            return true
-        }
-        let name = proc.name.lowercased()
-        if name.contains("pty-host") { return true }
-        return false
-    }
-
-    private static func workloadRows(_ processes: [Proc], sortDescending: Bool) -> [ListRow] {
-        var buckets: [WorkloadKind: [Proc]] = [:]
-        for proc in processes {
-            let comm = URL(fileURLWithPath: proc.path).lastPathComponent
-            if let kind = WorkloadKind.match(path: proc.path, argv0: proc.argv0, comm: comm.isEmpty ? proc.name : comm) {
-                buckets[kind, default: []].append(proc)
-            }
-        }
-        return WorkloadKind.allCases.compactMap { kind in
-            guard let members = buckets[kind], !members.isEmpty else { return nil }
-            return ListRow(
-                id: "wl:\(kind.rawValue)",
-                title: kind.rawValue,
-                bytes: members.reduce(0) { $0 + $1.bytes },
-                kind: .group,
-                depth: 0,
-                expandable: false,
-                expanded: false,
-                children: sortedProcs(members, descending: sortDescending)
-            )
-        }
-        .sorted { memoryBefore($0.bytes, $1.bytes, descending: sortDescending) }
     }
 
     private static func filterRows(_ rows: [ListRow], filter: String) -> [ListRow] {

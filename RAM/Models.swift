@@ -94,42 +94,13 @@ struct Proc: Identifiable, Sendable, Equatable {
 }
 
 enum ListView: String, CaseIterable, Identifiable, Sendable {
-    case app = "App"
     case process = "Process"
     case nested = "Nested"
-    case session = "Session"
-    case workload = "Workload"
 
     var id: String { rawValue }
 
     var next: ListView {
-        let all = Self.allCases
-        let idx = all.firstIndex(of: self).map { all.index(after: $0) } ?? all.startIndex
-        return idx == all.endIndex ? all[all.startIndex] : all[idx]
-    }
-}
-
-enum WorkloadKind: String, CaseIterable, Sendable {
-    case claudeCode = "Claude Code"
-    case grokBuild = "Grok Build"
-    case pi = "Pi"
-    case cursorAgent = "Cursor agent"
-
-    /// Closed list: exact last-path-component / comm / argv0 match. Not fuzzy. Not "any child of a terminal".
-    static func match(path: String, argv0: String, comm: String) -> WorkloadKind? {
-        let tokens = [path, argv0, comm]
-            .flatMap { $0.split(separator: " ").map(String.init) }
-            .map { URL(fileURLWithPath: $0).lastPathComponent.lowercased() }
-        for token in tokens {
-            switch token {
-            case "claude": return .claudeCode
-            case "grok": return .grokBuild
-            case "pi": return .pi
-            case "cursor-agent": return .cursorAgent
-            default: break
-            }
-        }
-        return nil
+        self == .nested ? .process : .nested
     }
 }
 

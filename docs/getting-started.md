@@ -42,7 +42,7 @@ If the app was built ad-hoc and never copied into `/Applications`, macOS may ref
 
 Click the chip. The popup polls while it is open; the chip keeps a slower poll so the percentage stays live.
 
-- **View** cycles App → Process → Nested → Session → Workload. Opening the popup starts on **Process**.
+- **View** cycles Nested → Process. Opening the popup starts on **Nested**.
 - Type in the filter to search names and PIDs. The list still caps at 10 rows.
 - **Force Quit** is offered only on a single process row, and asks every time.
 - **Activity Monitor** opens the system app. Jumping to the Memory tab uses AppleScript and is often blocked without Automation permission — RAM does not request that permission, so you may need to click **Memory** yourself.

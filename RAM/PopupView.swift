@@ -124,7 +124,7 @@ struct PopupView: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.mini)
-                .help("View cycles App → Process → Nested → Session → Workload")
+                .help("View cycles Nested → Process")
                 .accessibilityLabel("Group by \(store.listView.rawValue)")
 
                 Button {
@@ -193,8 +193,8 @@ struct PopupView: View {
         .layoutPriority(1)
     }
 
-    /// Process rows use their pid. Group rows (Nested/App parents, Session, Workload)
-    /// select the GUI-named child when present, otherwise the largest child.
+    /// Process rows use their pid. Nested parent `.group` rows are not selectable.
+    /// Icons for group rows still use the GUI-named child when present, else the largest child.
     private func process(for row: ListRow) -> Proc? {
         let largest = row.children.max(by: { $0.bytes < $1.bytes })
         let named = row.children.first {
@@ -213,7 +213,12 @@ struct PopupView: View {
 
     private func rowView(_ row: ListRow) -> some View {
         let proc = process(for: row)
-        let selected = proc.map { store.selectedProcessPid == $0.pid } ?? false
+        let selected: Bool = {
+            if case .process(let pid) = row.kind {
+                return store.selectedProcessPid == pid
+            }
+            return false
+        }()
         return ProcessRow(
             row: row,
             process: proc,
@@ -394,8 +399,8 @@ private struct ProcessRow: View {
         )
         .contentShape(Rectangle())
         .onTapGesture {
-            if let process {
-                onSelectProcess(process.pid)
+            if case .process(let pid) = row.kind {
+                onSelectProcess(pid)
             }
         }
         .onHover { hovering = $0 }
@@ -403,7 +408,7 @@ private struct ProcessRow: View {
 
     @ViewBuilder
     private var iconSlot: some View {
-        if selected, let process {
+        if selected, case .process = row.kind, let process {
             Button {
                 onForceQuit(process)
             } label: {
