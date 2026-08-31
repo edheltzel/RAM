@@ -11,7 +11,7 @@ struct RAMApp: App {
             PopupView()
                 .environment(store)
         } label: {
-            ChipLabel(percent: store.memory.usedPercent)
+            ChipLabel(percent: store.memory.usedPercent, pressure: store.memory.pressure)
         }
         .menuBarExtraStyle(.window)
     }
@@ -32,26 +32,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-/// Menu-bar extra: one gauge + percent. Color follows used percent (white / systemBlue / red at 60%+).
+/// Menu-bar extra: one gauge + percent. Color follows used percent (white/blue), then pressure at 60%+.
 struct ChipLabel: View {
     var percent: Int
+    var pressure: PressureLevel
+
+    /// Three discrete steps from the existing used-percent bands.
+    private var gaugeValue: Double {
+        if percent < 30 { return 0.33 }
+        if percent < 60 { return 0.66 }
+        return 1.0
+    }
 
     private var tint: Color {
+        Color(nsColor: Self.color(percent: percent, pressure: pressure))
+    }
+
+    /// used < 30% white, < 60% blue, else pressure (green/orange/red).
+    static func color(percent: Int, pressure: PressureLevel) -> NSColor {
         if percent < 30 { return .white }
-        if percent < 60 { return Color(nsColor: .systemBlue) }
-        return Color(nsColor: .systemRed)
+        if percent < 60 { return .systemBlue }
+        return pressure.color
     }
 
     var body: some View {
         HStack(spacing: 4) {
-            Image(systemName: "gauge.open.with.lines.needle.33percent")
+            Image(systemName: "gauge.open.with.lines.needle.33percent", variableValue: gaugeValue)
                 .font(.system(size: 13, weight: .medium))
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(tint)
+                .symbolEffect(.variableColor, value: gaugeValue)
             Text("\(percent)%")
                 .font(.system(size: 12, weight: .medium).monospacedDigit())
                 .foregroundStyle(tint)
         }
+        .animation(.easeInOut(duration: 0.35), value: gaugeValue)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("RAM \(percent)%")
         .help("RAM \(percent)%")
