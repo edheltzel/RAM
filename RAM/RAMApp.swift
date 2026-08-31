@@ -36,13 +36,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 struct ChipLabel: View {
     var percent: Int
 
-    /// Three discrete steps from the existing used-percent bands.
-    private var gaugeValue: Double {
-        if percent < 30 { return 0.33 }
-        if percent < 60 { return 0.66 }
-        return 1.0
-    }
-
     private var tint: Color {
         if percent < 30 { return .white }
         if percent < 60 { return Color(nsColor: .systemBlue) }
@@ -51,16 +44,14 @@ struct ChipLabel: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            Image(systemName: "gauge.open.with.lines.needle.33percent", variableValue: gaugeValue)
+            Image(systemName: "gauge.open.with.lines.needle.33percent")
                 .font(.system(size: 13, weight: .medium))
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(tint)
-                .symbolEffect(.variableColor, value: gaugeValue)
             Text("\(percent)%")
                 .font(.system(size: 12, weight: .medium).monospacedDigit())
                 .foregroundStyle(tint)
         }
-        .animation(.easeInOut(duration: 0.35), value: gaugeValue)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("RAM \(percent)%")
         .help("RAM \(percent)%")
