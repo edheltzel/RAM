@@ -237,21 +237,27 @@ struct PopupView: View {
                 .padding(.horizontal, 6)
                 .padding(.vertical, 3)
 
-                Button("Activity Monitor") {
+                Button {
                     store.openActivityMonitor()
+                } label: {
+                    Image(systemName: "waveform.path.ecg.rectangle.fill")
                 }
                 .buttonStyle(MenuActionStyle())
                 .font(.system(size: 11))
                 .help(store.activityMonitorNote ?? "Activity Monitor")
+                .accessibilityLabel("Activity Monitor")
                 .lineLimit(1)
                 .fixedSize()
 
-                Button("Quit") {
+                Button {
                     store.quit()
+                } label: {
+                    Image(systemName: "power")
                 }
                 .buttonStyle(MenuActionStyle())
                 .font(.system(size: 11))
                 .help("Quit")
+                .accessibilityLabel("Quit")
                 .lineLimit(1)
                 .fixedSize()
             }
