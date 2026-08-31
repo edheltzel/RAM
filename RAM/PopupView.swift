@@ -180,32 +180,40 @@ struct PopupView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, 8)
             }
+            Spacer(minLength: 0)
+                .frame(maxWidth: .infinity)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    store.clearSelection()
+                }
         }
         // 10 capped rows: 16pt icon + 4pt vertical padding each side.
         .frame(minHeight: CGFloat(Grouping.rowCap) * 24, alignment: .top)
         .clipped()
         .layoutPriority(1)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            store.clearSelection()
+    }
+
+    /// Process rows use their pid. Group rows (Nested/App parents, Session, Workload)
+    /// select the GUI-named child when present, otherwise the largest child.
+    private func process(for row: ListRow) -> Proc? {
+        let largest = row.children.max(by: { $0.bytes < $1.bytes })
+        let named = row.children.first {
+            $0.displayName.caseInsensitiveCompare(row.title) == .orderedSame
+        }
+        switch row.kind {
+        case .process(let pid):
+            return store.processes.first(where: { $0.pid == pid })
+                ?? row.children.first(where: { $0.pid == pid })
+                ?? named
+                ?? largest
+        case .group:
+            return named ?? largest
         }
     }
 
     private func rowView(_ row: ListRow) -> some View {
-        let proc: Proc? = {
-            if case .process(let pid) = row.kind {
-                return store.processes.first(where: { $0.pid == pid })
-                    ?? row.children.first(where: { $0.pid == pid })
-                    ?? row.children.first
-            }
-            return row.children.first
-        }()
-        let selected: Bool = {
-            if case .process(let pid) = row.kind {
-                return store.selectedProcessPid == pid
-            }
-            return false
-        }()
+        let proc = process(for: row)
+        let selected = proc.map { store.selectedProcessPid == $0.pid } ?? false
         return ProcessRow(
             row: row,
             process: proc,
@@ -375,12 +383,6 @@ private struct ProcessRow: View {
                     .fontWeight(.semibold)
                     .monospacedDigit()
             }
-            .contentShape(Rectangle())
-            .onTapGesture {
-                if case .process(let pid) = row.kind {
-                    onSelectProcess(pid)
-                }
-            }
         }
         .font(.system(size: 11))
         .padding(.leading, CGFloat(row.depth) * 10)
@@ -389,20 +391,19 @@ private struct ProcessRow: View {
         .background(
             RoundedRectangle(cornerRadius: 4)
                 .fill(selected ? Color.primary.opacity(0.10) : (hovering ? Color.primary.opacity(0.06) : Color.clear))
-                .contentShape(RoundedRectangle(cornerRadius: 4))
-                .onTapGesture {
-                    if case .process(let pid) = row.kind {
-                        onSelectProcess(pid)
-                    }
-                }
         )
         .contentShape(Rectangle())
+        .onTapGesture {
+            if let process {
+                onSelectProcess(process.pid)
+            }
+        }
         .onHover { hovering = $0 }
     }
 
     @ViewBuilder
     private var iconSlot: some View {
-        if selected, case .process = row.kind, let process {
+        if selected, let process {
             Button {
                 onForceQuit(process)
             } label: {
@@ -415,26 +416,16 @@ private struct ProcessRow: View {
             .buttonStyle(.plain)
             .help("Force Quit…")
             .accessibilityLabel("Force Quit…")
+        } else if let process {
+            Image(nsImage: process.rowIcon)
+                .resizable()
+                .interpolation(.high)
+                .frame(width: 16, height: 16)
         } else {
-            Group {
-                if let process {
-                    Image(nsImage: process.rowIcon)
-                        .resizable()
-                        .interpolation(.high)
-                        .frame(width: 16, height: 16)
-                } else {
-                    Image(systemName: "app")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 16, height: 16)
-                }
-            }
-            .contentShape(Rectangle())
-            .onTapGesture {
-                if case .process(let pid) = row.kind {
-                    onSelectProcess(pid)
-                }
-            }
+            Image(systemName: "app")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+                .frame(width: 16, height: 16)
         }
     }
 }

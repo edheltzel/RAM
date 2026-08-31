@@ -313,7 +313,9 @@ final class Store {
             ) { [weak self] _ in
                 Task { @MainActor in
                     guard let self, self.popupOpen else { return }
-                    if let window = self.popoverWindow, self.isSheetBlockingDismiss(window) { return }
+                    if let window = self.popoverWindow {
+                        if window.isVisible || self.isSheetBlockingDismiss(window) { return }
+                    }
                     self.popupDisappeared()
                 }
             }
