@@ -37,6 +37,7 @@ enum MemorySampler {
             app: app,
             wired: wired,
             compressed: compressed,
+            swap: swapUsed(),
             pressureSysctl: pressureLevel,
             pressure: PressureLevel.from(sysctl: pressureLevel),
             sampledAt: Date()
@@ -60,5 +61,12 @@ enum MemorySampler {
         var size = MemoryLayout<Int32>.size
         let rc = sysctlbyname("kern.memorystatus_vm_pressure_level", &level, &size, nil, 0)
         return rc == 0 ? Int(level) : 0
+    }
+
+    private static func swapUsed() -> UInt64 {
+        var usage = xsw_usage()
+        var size = MemoryLayout<xsw_usage>.size
+        let rc = sysctlbyname("vm.swapusage", &usage, &size, nil, 0)
+        return rc == 0 ? UInt64(usage.xsu_used) : 0
     }
 }

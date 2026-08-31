@@ -47,12 +47,13 @@ struct MemorySnapshot: Equatable, Sendable {
     var app: UInt64
     var wired: UInt64
     var compressed: UInt64
+    var swap: UInt64
     var pressureSysctl: Int
     var pressure: PressureLevel
     var sampledAt: Date
 
     static let empty = MemorySnapshot(
-        total: 1, used: 0, free: 1, app: 0, wired: 0, compressed: 0,
+        total: 1, used: 0, free: 1, app: 0, wired: 0, compressed: 0, swap: 0,
         pressureSysctl: 0, pressure: .normal, sampledAt: .distantPast
     )
 
@@ -66,6 +67,13 @@ struct MemorySnapshot: Equatable, Sendable {
         guard total > 0 else { return 0 }
         return Double(total - free) / Double(total)
     }
+}
+
+struct HistoryPoint: Equatable, Sendable {
+    var fraction: Double
+    var sampledAt: Date
+
+    var percent: Int { Int((fraction * 100).rounded()) }
 }
 
 struct Proc: Identifiable, Sendable, Equatable {
@@ -152,6 +160,12 @@ enum ByteFormat {
         if b >= kib { return String(format: "%.0f KB", b / kib) }
         return "\(bytes) B"
     }
+
+    /// Stats wording for swap, including the zero case.
+    static func swap(_ bytes: UInt64) -> String {
+        if bytes == 0 { return "Zero KB" }
+        return memory(bytes)
+    }
 }
 
 enum Palette {
@@ -159,4 +173,33 @@ enum Palette {
     static let wired = NSColor.systemOrange
     static let compressed = NSColor.systemPink
     static let free = NSColor.systemGray
+}
+
+extension Proc {
+    /// 16pt icon for a process row: workspace file icon, else generic application.
+    var rowIcon: NSImage {
+        if let bundleIdentifier, !bundleIdentifier.isEmpty,
+           let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) {
+            return Self.sizedWorkspaceIcon(forFile: url.path)
+        }
+        if !path.isEmpty {
+            return Self.sizedWorkspaceIcon(forFile: path)
+        }
+        if !argv0.isEmpty {
+            return Self.sizedWorkspaceIcon(forFile: argv0)
+        }
+        if let named = NSImage(named: NSImage.applicationIconName) {
+            let copy = named.copy() as? NSImage ?? named
+            copy.size = NSSize(width: 16, height: 16)
+            return copy
+        }
+        return NSImage(systemSymbolName: "app", accessibilityDescription: nil) ?? NSImage()
+    }
+
+    private static func sizedWorkspaceIcon(forFile filePath: String) -> NSImage {
+        let icon = NSWorkspace.shared.icon(forFile: filePath)
+        let copy = icon.copy() as? NSImage ?? icon
+        copy.size = NSSize(width: 16, height: 16)
+        return copy
+    }
 }

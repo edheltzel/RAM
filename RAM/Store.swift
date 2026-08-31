@@ -7,7 +7,7 @@ import Observation
 @Observable
 final class Store {
     var memory: MemorySnapshot = .empty
-    var history: [Double] = []
+    var history: [HistoryPoint] = []
     var processes: [Proc] = []
     var popupOpen = false
     var listView: ListView = .process
@@ -15,7 +15,11 @@ final class Store {
     var expanded: Set<String> = []
     var activityMonitorNote: String?
     var forceQuitTarget: Proc?
+    var selectedProcessPid: Int32?
     var launchAtLogin = LaunchAtLogin.isEnabled
+
+    @ObservationIgnored
+    weak var popoverWindow: NSWindow?
 
     private var chipTimer: Timer?
     private var popupTimer: Timer?
@@ -34,6 +38,8 @@ final class Store {
         filter = ""
         expanded = []
         activityMonitorNote = nil
+        forceQuitTarget = nil
+        selectedProcessPid = nil
         refreshMemory()
         refreshProcesses()
         startPopupTimer()
@@ -43,11 +49,20 @@ final class Store {
         popupOpen = false
         popupTimer?.invalidate()
         popupTimer = nil
+        if let window = popoverWindow, let sheet = window.attachedSheet {
+            window.endSheet(sheet, returnCode: .abort)
+        }
+        forceQuitTarget = nil
+        selectedProcessPid = nil
+        filter = ""
+        popoverWindow = nil
     }
 
     func cycleView() {
         listView = listView.next
         expanded = []
+        selectedProcessPid = nil
+        forceQuitTarget = nil
     }
 
     func toggleExpanded(_ id: String) {
@@ -67,14 +82,58 @@ final class Store {
         activityMonitorNote = ActivityMonitorOpener.open()
     }
 
-    func confirmForceQuit(_ proc: Proc) {
+    func selectProcess(pid: Int32) {
+        if selectedProcessPid == pid {
+            selectedProcessPid = nil
+            forceQuitTarget = nil
+        } else {
+            selectedProcessPid = pid
+            forceQuitTarget = nil
+        }
+    }
+
+    func clearSelection() {
+        selectedProcessPid = nil
+        forceQuitTarget = nil
+    }
+
+    func requestForceQuit(_ proc: Proc, window: NSWindow? = nil) {
+        if let window {
+            popoverWindow = window
+        }
+        let host = window ?? popoverWindow
         forceQuitTarget = proc
+        guard let host, host.attachedSheet == nil else { return }
+
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Force Quit \(proc.displayName)?"
+        let forceQuitButton = alert.addButton(withTitle: "Force Quit")
+        forceQuitButton.hasDestructiveAction = true
+        forceQuitButton.keyEquivalent = ""
+        let cancelButton = alert.addButton(withTitle: "Cancel")
+        cancelButton.keyEquivalent = "\u{1b}"
+        alert.window.defaultButtonCell = nil
+
+        alert.beginSheetModal(for: host) { [weak self] response in
+            guard let self else { return }
+            if response == .alertFirstButtonReturn {
+                self.performForceQuit()
+            } else {
+                self.cancelForceQuit()
+            }
+        }
+    }
+
+    func cancelForceQuit() {
+        forceQuitTarget = nil
     }
 
     func performForceQuit() {
         guard let proc = forceQuitTarget else { return }
         kill(proc.pid, SIGKILL)
         forceQuitTarget = nil
+        selectedProcessPid = nil
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
             self?.refreshProcesses()
             self?.refreshMemory()
@@ -83,6 +142,46 @@ final class Store {
 
     func quit() {
         NSApp.terminate(nil)
+    }
+
+    /// Type-to-filter like a menu: printable keys append, delete backs up, escape clears.
+    /// Returns nil when the event is consumed so the menu extra keeps focus.
+    func handleFilterKey(_ event: NSEvent) -> NSEvent? {
+        if !event.modifierFlags.intersection([.command, .control, .option]).isEmpty {
+            return event
+        }
+        // Sheet owns keys while Force Quit is up. Do not treat Return as confirm.
+        if forceQuitTarget != nil {
+            return event
+        }
+        if event.keyCode == 53 { // escape
+            if !filter.isEmpty {
+                filter = ""
+                return nil
+            }
+            if selectedProcessPid != nil {
+                selectedProcessPid = nil
+                return nil
+            }
+            return event
+        }
+        if event.keyCode == 51 { // delete
+            if !filter.isEmpty {
+                filter.removeLast()
+                return nil
+            }
+            return event
+        }
+        guard let chars = event.charactersIgnoringModifiers, chars.count == 1,
+              let ch = chars.first, ch.isASCII else {
+            return event
+        }
+        if ch.isLetter || ch.isNumber || ch == " " || ch == "-" || ch == "." || ch == "_" {
+            filter.append(ch)
+            selectedProcessPid = nil
+            return nil
+        }
+        return event
     }
 
     var rows: [ListRow] {
@@ -114,7 +213,7 @@ final class Store {
     private func refreshMemory() {
         let snap = MemorySampler.snapshot()
         memory = snap
-        history.append(snap.usedFraction)
+        history.append(HistoryPoint(fraction: snap.usedFraction, sampledAt: snap.sampledAt))
         if history.count > historyCap {
             history.removeFirst(history.count - historyCap)
         }
@@ -122,5 +221,11 @@ final class Store {
 
     private func refreshProcesses() {
         processes = ProcessSampler.list()
+        if let pid = selectedProcessPid, !processes.contains(where: { $0.pid == pid }) {
+            selectedProcessPid = nil
+            if forceQuitTarget?.pid == pid {
+                forceQuitTarget = nil
+            }
+        }
     }
 }

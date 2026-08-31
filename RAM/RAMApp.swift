@@ -32,32 +32,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
+/// Menu-bar extra: black/clear SF Symbol, system tints. Bar is 24 pt.
 struct ChipLabel: View {
     var percent: Int
     var pressure: PressureLevel
 
     var body: some View {
-        Image(nsImage: Self.image(percent: percent, color: pressure.color))
-            .renderingMode(.original)
-    }
-
-    private static func image(percent: Int, color: NSColor) -> NSImage {
-        let text = "RAM \(percent)%"
-        let font = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium)
-        let attrs: [NSAttributedString.Key: Any] = [
-            .font: font,
-            .foregroundColor: color,
-        ]
-        let textSize = (text as NSString).size(withAttributes: attrs)
-        let size = NSSize(width: ceil(textSize.width) + 2, height: 18)
-        let image = NSImage(size: size, flipped: false) { rect in
-            (text as NSString).draw(
-                at: NSPoint(x: 1, y: (rect.height - textSize.height) / 2),
-                withAttributes: attrs
-            )
-            return true
-        }
-        image.isTemplate = false
-        return image
+        Image(systemName: "memorychip")
+            .symbolRenderingMode(.monochrome)
+            .font(.system(size: 14, weight: .medium))
+            .frame(height: 24)
+            .accessibilityLabel("RAM \(percent) percent, \(pressure.title)")
+            .help("RAM \(percent)%")
     }
 }
