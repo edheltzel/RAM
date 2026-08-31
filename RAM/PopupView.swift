@@ -205,38 +205,45 @@ struct PopupView: View {
     }
 
     private var footer: some View {
-        HStack(spacing: 4) {
-            Toggle("Launch at Login", isOn: Binding(
-                get: { store.launchAtLogin },
-                set: { store.setLaunchAtLogin($0) }
-            ))
-            .toggleStyle(.checkbox)
-            .font(.system(size: 11))
-            .help("Open RAM when you log in")
-            .lineLimit(1)
-            .fixedSize()
+        VStack(spacing: 0) {
+            Rectangle()
+                .fill(Color.primary.opacity(0.22))
+                .frame(height: 1)
 
-            Spacer(minLength: 4)
+            HStack(spacing: 6) {
+                Toggle("Launch at Login", isOn: Binding(
+                    get: { store.launchAtLogin },
+                    set: { store.setLaunchAtLogin($0) }
+                ))
+                .toggleStyle(.checkbox)
+                .font(.system(size: 11))
+                .help("Open RAM when you log in")
+                .lineLimit(1)
+                .fixedSize()
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
 
-            Button("Activity Monitor") {
-                store.openActivityMonitor()
+                Button("Activity Monitor") {
+                    store.openActivityMonitor()
+                }
+                .buttonStyle(MenuActionStyle())
+                .font(.system(size: 11))
+                .help(store.activityMonitorNote ?? "Activity Monitor")
+                .lineLimit(1)
+                .fixedSize()
+
+                Button("Quit") {
+                    store.quit()
+                }
+                .buttonStyle(MenuActionStyle())
+                .font(.system(size: 11))
+                .help("Quit")
+                .lineLimit(1)
+                .fixedSize()
             }
-            .buttonStyle(MenuActionStyle())
-            .font(.system(size: 11))
-            .help(store.activityMonitorNote ?? "Activity Monitor")
-            .lineLimit(1)
-            .fixedSize()
-
-            Button("Quit") {
-                store.quit()
-            }
-            .buttonStyle(MenuActionStyle())
-            .font(.system(size: 11))
-            .help("Quit")
-            .lineLimit(1)
-            .fixedSize()
+            .frame(maxWidth: .infinity)
+            .padding(.top, 12)
         }
-        .padding(.top, 16)
     }
 
     private func sectionTitle(_ text: String) -> some View {
@@ -425,6 +432,7 @@ private struct MenuActionChrome: View {
 
     var body: some View {
         configuration.label
+            .multilineTextAlignment(.center)
             .padding(.horizontal, 6)
             .padding(.vertical, 3)
             .background(
