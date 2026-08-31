@@ -181,7 +181,8 @@ struct PopupView: View {
                     .padding(.vertical, 8)
             }
         }
-        .frame(minHeight: 220, alignment: .top)
+        // 10 capped rows: 16pt icon + 4pt vertical padding each side.
+        .frame(minHeight: CGFloat(Grouping.rowCap) * 24, alignment: .top)
         .contentShape(Rectangle())
         .onTapGesture {
             store.clearSelection()
@@ -255,6 +256,7 @@ struct PopupView: View {
             .frame(maxWidth: .infinity)
             .padding(.top, 12)
         }
+        .padding(.top, 8)
     }
 
     private func sectionTitle(_ text: String) -> some View {
