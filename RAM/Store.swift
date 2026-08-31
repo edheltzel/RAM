@@ -24,6 +24,7 @@ final class Store {
 
     private var chipTimer: Timer?
     private var popupTimer: Timer?
+    private var extraWindowObservers: [NSObjectProtocol] = []
     private let historyCap = 60
 
     init() {
@@ -34,17 +35,21 @@ final class Store {
     }
 
     func popupAppeared() {
+        let alreadyOpen = popupOpen
         popupOpen = true
-        listView = .process
-        filter = ""
-        filterRevealed = false
-        expanded = []
-        activityMonitorNote = nil
-        forceQuitTarget = nil
-        selectedProcessPid = nil
+        if !alreadyOpen {
+            listView = .process
+            filter = ""
+            filterRevealed = false
+            expanded = []
+            activityMonitorNote = nil
+            forceQuitTarget = nil
+            selectedProcessPid = nil
+        }
         refreshMemory()
         refreshProcesses()
         startPopupTimer()
+        popoverWindow?.makeKey()
         NSApp.activate(ignoringOtherApps: true)
     }
 
@@ -59,7 +64,22 @@ final class Store {
         selectedProcessPid = nil
         filter = ""
         filterRevealed = false
-        popoverWindow = nil
+        processes = []
+        // Keep popoverWindow so becomeKey can restart sampling if SwiftUI skips onAppear.
+    }
+
+    /// MenuBarExtra .window often keeps PopupView mounted after dismiss (onDisappear never fires)
+    /// and can skip onAppear on the next click. Drive open/closed from the extra window itself.
+    func noteExtraWindow(_ window: NSWindow?) {
+        guard let window else { return }
+        bindExtraWindow(window)
+        if window.isVisible {
+            if !popupOpen {
+                popupAppeared()
+            }
+        } else if popupOpen && !isSheetBlockingDismiss(window) {
+            popupDisappeared()
+        }
     }
 
     func toggleFilter() {
@@ -207,7 +227,12 @@ final class Store {
         chipTimer?.invalidate()
         chipTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
             Task { @MainActor in
-                self?.refreshMemory()
+                guard let self else { return }
+                if self.popupOpen {
+                    self.stopPopupIfWindowHidden()
+                    if self.popupOpen { return }
+                }
+                self.refreshMemory()
             }
         }
         chipTimer?.tolerance = 1
@@ -218,6 +243,7 @@ final class Store {
         popupTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 guard let self, self.popupOpen else { return }
+                if self.stopPopupIfWindowHidden() { return }
                 self.refreshMemory()
                 self.refreshProcesses()
             }
@@ -228,10 +254,57 @@ final class Store {
     private func refreshMemory() {
         let snap = MemorySampler.snapshot()
         memory = snap
+        guard popupOpen else { return }
         history.append(HistoryPoint(fraction: snap.usedFraction, sampledAt: snap.sampledAt))
         if history.count > historyCap {
             history.removeFirst(history.count - historyCap)
         }
+    }
+
+    @discardableResult
+    private func stopPopupIfWindowHidden() -> Bool {
+        guard let window = popoverWindow else { return false }
+        guard !window.isVisible, !isSheetBlockingDismiss(window) else { return false }
+        popupDisappeared()
+        return true
+    }
+
+    private func isSheetBlockingDismiss(_ window: NSWindow) -> Bool {
+        forceQuitTarget != nil || window.attachedSheet != nil || window.isSheet
+    }
+
+    private func bindExtraWindow(_ window: NSWindow) {
+        if popoverWindow === window, !extraWindowObservers.isEmpty { return }
+        for observer in extraWindowObservers {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        extraWindowObservers = []
+        popoverWindow = window
+        extraWindowObservers.append(
+            NotificationCenter.default.addObserver(
+                forName: NSWindow.didBecomeKeyNotification,
+                object: window,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor in
+                    guard let self, !self.popupOpen else { return }
+                    self.popupAppeared()
+                }
+            }
+        )
+        extraWindowObservers.append(
+            NotificationCenter.default.addObserver(
+                forName: NSWindow.didResignKeyNotification,
+                object: window,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor in
+                    guard let self, self.popupOpen else { return }
+                    if let window = self.popoverWindow, self.isSheetBlockingDismiss(window) { return }
+                    self.popupDisappeared()
+                }
+            }
+        )
     }
 
     private func refreshProcesses() {

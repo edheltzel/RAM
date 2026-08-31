@@ -18,8 +18,7 @@ struct PopupView: View {
         .padding(12)
         .background {
             WindowAccessor { window in
-                store.popoverWindow = window
-                window?.makeKey()
+                store.noteExtraWindow(window)
             }
         }
         .frame(width: 300)
