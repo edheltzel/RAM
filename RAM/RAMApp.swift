@@ -32,16 +32,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-/// Menu-bar extra: filled memorychip + percent. Pressure colors the chip. Not text-only.
+/// Menu-bar extra: filled memorychip + percent. Color follows used percent (white/blue), then pressure at 60%+.
 struct ChipLabel: View {
     var percent: Int
     var pressure: PressureLevel
 
     var body: some View {
-        Image(nsImage: Self.image(percent: percent, color: pressure.color))
+        Image(nsImage: Self.image(percent: percent, color: Self.color(percent: percent, pressure: pressure)))
             .renderingMode(.original)
             .accessibilityLabel("RAM \(percent) percent, \(pressure.title)")
             .help("RAM \(percent)%")
+    }
+
+    /// used < 30% white, < 60% blue, else pressure (green/orange/red).
+    static func color(percent: Int, pressure: PressureLevel) -> NSColor {
+        if percent < 30 { return .white }
+        if percent < 60 { return .systemBlue }
+        return pressure.color
     }
 
     private static func image(percent: Int, color: NSColor) -> NSImage {
