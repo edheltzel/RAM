@@ -11,7 +11,7 @@ struct RAMApp: App {
             PopupView()
                 .environment(store)
         } label: {
-            ChipLabel(percent: store.memory.usedPercent, pressure: store.memory.pressure)
+            ChipLabel(percent: store.memory.usedPercent)
         }
         .menuBarExtraStyle(.window)
     }
@@ -32,58 +32,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-/// Menu-bar extra: filled memorychip + percent. Color follows used percent (white/blue), then pressure at 60%+.
+/// Menu-bar extra: one gauge + percent. Color follows used percent (white / systemBlue / red at 60%+).
 struct ChipLabel: View {
     var percent: Int
-    var pressure: PressureLevel
+
+    /// Three discrete steps from the existing used-percent bands.
+    private var gaugeValue: Double {
+        if percent < 30 { return 0.33 }
+        if percent < 60 { return 0.66 }
+        return 1.0
+    }
+
+    private var tint: Color {
+        if percent < 30 { return .white }
+        if percent < 60 { return Color(nsColor: .systemBlue) }
+        return Color(nsColor: .systemRed)
+    }
 
     var body: some View {
-        Image(nsImage: Self.image(percent: percent, color: Self.color(percent: percent, pressure: pressure)))
-            .renderingMode(.original)
-            .accessibilityLabel("RAM \(percent) percent, \(pressure.title)")
-            .help("RAM \(percent)%")
-    }
-
-    /// used < 30% white, < 60% blue, else pressure (green/orange/red).
-    static func color(percent: Int, pressure: PressureLevel) -> NSColor {
-        if percent < 30 { return .white }
-        if percent < 60 { return .systemBlue }
-        return pressure.color
-    }
-
-    private static func image(percent: Int, color: NSColor) -> NSImage {
-        let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .medium)
-            .applying(NSImage.SymbolConfiguration(hierarchicalColor: color))
-        let symbol = NSImage(systemSymbolName: "memorychip.fill", accessibilityDescription: nil)?
-            .withSymbolConfiguration(config) ?? NSImage()
-        let iconSize = symbol.size
-
-        let text = "\(percent)%"
-        let font = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium)
-        let attrs: [NSAttributedString.Key: Any] = [
-            .font: font,
-            .foregroundColor: color,
-        ]
-        let textSize = (text as NSString).size(withAttributes: attrs)
-        let gap: CGFloat = 4
-        let height: CGFloat = 24
-        let width = ceil(iconSize.width) + gap + ceil(textSize.width) + 2
-        let image = NSImage(size: NSSize(width: width, height: height), flipped: false) { rect in
-            let iconY = (rect.height - iconSize.height) / 2
-            symbol.draw(
-                at: NSPoint(x: 1, y: iconY),
-                from: NSRect(origin: .zero, size: iconSize),
-                operation: .sourceOver,
-                fraction: 1
-            )
-            let textY = (rect.height - textSize.height) / 2
-            (text as NSString).draw(
-                at: NSPoint(x: 1 + iconSize.width + gap, y: textY),
-                withAttributes: attrs
-            )
-            return true
+        HStack(spacing: 4) {
+            Image(systemName: "gauge.open.with.lines.needle.33percent", variableValue: gaugeValue)
+                .font(.system(size: 13, weight: .medium))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(tint)
+                .symbolEffect(.variableColor, value: gaugeValue)
+            Text("\(percent)%")
+                .font(.system(size: 12, weight: .medium).monospacedDigit())
+                .foregroundStyle(tint)
         }
-        image.isTemplate = false
-        return image
+        .animation(.easeInOut(duration: 0.35), value: gaugeValue)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("RAM \(percent)%")
+        .help("RAM \(percent)%")
     }
 }
