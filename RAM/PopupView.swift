@@ -219,7 +219,7 @@ struct PopupView: View {
             .lineLimit(1)
             .fixedSize()
         }
-        .padding(.top, 4)
+        .padding(.top, 16)
     }
 
     private func sectionTitle(_ text: String) -> some View {
@@ -344,6 +344,12 @@ private struct ProcessRow: View {
         .background(
             RoundedRectangle(cornerRadius: 4)
                 .fill(selected ? Color.primary.opacity(0.10) : (hovering ? Color.primary.opacity(0.06) : Color.clear))
+                .contentShape(RoundedRectangle(cornerRadius: 4))
+                .onTapGesture {
+                    if case .process(let pid) = row.kind {
+                        onSelectProcess(pid)
+                    }
+                }
         )
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
