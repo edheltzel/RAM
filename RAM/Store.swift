@@ -10,7 +10,7 @@ final class Store {
     var history: [HistoryPoint] = []
     var processes: [Proc] = []
     var popupOpen = false
-    var listView: ListView = .process
+    var listView: ListView = .nested
     var filter = ""
     var filterRevealed = false
     var expanded: Set<String> = []
@@ -28,6 +28,10 @@ final class Store {
     private let historyCap = 60
 
     init() {
+        if let raw = UserDefaults.standard.string(forKey: "ram.listView"),
+           let saved = ListView(rawValue: raw) {
+            listView = saved
+        }
         refreshMemory()
         startChipTimer()
         LaunchAtLogin.applyDefault()
@@ -38,7 +42,6 @@ final class Store {
         let alreadyOpen = popupOpen
         popupOpen = true
         if !alreadyOpen {
-            listView = .process
             filter = ""
             filterRevealed = false
             expanded = []
@@ -96,6 +99,7 @@ final class Store {
         expanded = []
         selectedProcessPid = nil
         forceQuitTarget = nil
+        UserDefaults.standard.set(listView.rawValue, forKey: "ram.listView")
     }
 
     func toggleExpanded(_ id: String) {
