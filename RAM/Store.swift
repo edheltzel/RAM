@@ -62,8 +62,13 @@ final class Store {
         popoverWindow = nil
     }
 
-    func revealFilter() {
-        filterRevealed = true
+    func toggleFilter() {
+        if filterRevealed || !filter.isEmpty {
+            filter = ""
+            filterRevealed = false
+        } else {
+            filterRevealed = true
+        }
     }
 
     func cycleView() {

@@ -129,14 +129,14 @@ struct PopupView: View {
                 .accessibilityLabel("Group by \(store.listView.rawValue)")
 
                 Button {
-                    store.revealFilter()
+                    store.toggleFilter()
                 } label: {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 11, weight: .medium))
                 }
                 .buttonStyle(.plain)
-                .help("Filter processes")
-                .accessibilityLabel("Filter processes")
+                .help(store.filterRevealed || !store.filter.isEmpty ? "Hide search" : "Show search")
+                .accessibilityLabel(store.filterRevealed || !store.filter.isEmpty ? "Hide search" : "Show search")
             }
             if store.filterRevealed || !store.filter.isEmpty {
                 filterField
