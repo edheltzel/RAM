@@ -183,6 +183,8 @@ struct PopupView: View {
         }
         // 10 capped rows: 16pt icon + 4pt vertical padding each side.
         .frame(minHeight: CGFloat(Grouping.rowCap) * 24, alignment: .top)
+        .clipped()
+        .layoutPriority(1)
         .contentShape(Rectangle())
         .onTapGesture {
             store.clearSelection()
