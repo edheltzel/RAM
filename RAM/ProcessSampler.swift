@@ -15,7 +15,6 @@ enum ProcessSampler {
             let bsd = bsdInfo(pid: pid)
             let path = pidPath(pid: pid)
             let comm = bsd?.name ?? pidName(pid: pid)
-            let argv0 = arguments0(pid: pid) ?? ""
             let app = appsByPID[pid]
             let display: String
             if let localized = app?.localizedName, !localized.isEmpty {
@@ -30,12 +29,9 @@ enum ProcessSampler {
             result.append(
                 Proc(
                     pid: pid,
-                    ppid: bsd?.ppid ?? 0,
                     name: display,
                     path: path,
-                    argv0: argv0,
                     bytes: bytes,
-                    ttyDev: bsd?.tdev ?? 0,
                     bundleIdentifier: app?.bundleIdentifier
                 )
             )
@@ -44,8 +40,6 @@ enum ProcessSampler {
     }
 
     private struct BSD {
-        var ppid: Int32
-        var tdev: UInt32
         var name: String
     }
 
@@ -85,7 +79,7 @@ enum ProcessSampler {
         let name = withUnsafeBytes(of: info.pbi_name) { raw in
             String(cString: raw.bindMemory(to: CChar.self).baseAddress!)
         }
-        return BSD(ppid: Int32(info.pbi_ppid), tdev: info.e_tdev, name: name)
+        return BSD(name: name)
     }
 
     private static func pidPath(pid: Int32) -> String {
@@ -102,23 +96,6 @@ enum ProcessSampler {
         return String(cString: buffer)
     }
 
-    /// argv0 only — never keep the rest of the vector (tokens often include secrets).
-    private static func arguments0(pid: Int32) -> String? {
-        var mib: [Int32] = [CTL_KERN, KERN_ARGMAX]
-        var argmax: Int32 = 0
-        var size = MemoryLayout<Int32>.size
-        guard sysctl(&mib, 2, &argmax, &size, nil, 0) == 0, argmax > 0 else { return nil }
-        var buf = [CChar](repeating: 0, count: Int(argmax))
-        mib = [CTL_KERN, KERN_PROCARGS2, pid]
-        var bufSize = buf.count
-        guard sysctl(&mib, 3, &buf, &bufSize, nil, 0) == 0, bufSize > 4 else { return nil }
-        // KERN_PROCARGS2: Int32 argc, then exec path, then argv0...
-        var offset = MemoryLayout<Int32>.size
-        while offset < bufSize && buf[offset] != 0 { offset += 1 }
-        while offset < bufSize && buf[offset] == 0 { offset += 1 }
-        guard offset < bufSize else { return nil }
-        return String(cString: buf.withUnsafeBufferPointer { $0.baseAddress! + offset })
-    }
 
     private static func runningApps() -> [Int32: NSRunningApplication] {
         var map: [Int32: NSRunningApplication] = [:]

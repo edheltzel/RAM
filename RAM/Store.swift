@@ -38,7 +38,6 @@ final class Store {
         }
         refreshMemory()
         startChipTimer()
-        LaunchAtLogin.applyDefault()
         launchAtLogin = LaunchAtLogin.isEnabled
     }
 
@@ -177,13 +176,34 @@ final class Store {
 
     func performForceQuit() {
         guard let proc = forceQuitTarget else { return }
+        NSRunningApplication(processIdentifier: proc.pid)?.forceTerminate()
         kill(proc.pid, SIGKILL)
         forceQuitTarget = nil
         selectedProcessPid = nil
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-            self?.refreshProcesses()
-            self?.refreshMemory()
+            guard let self else { return }
+            if Self.isRunning(proc.pid) {
+                self.presentForceQuitFailed(proc)
+            }
+            self.refreshProcesses()
+            self.refreshMemory()
         }
+    }
+
+    /// `kill(pid, 0)` succeeds if we can signal it. EPERM means it is alive but not ours.
+    private static func isRunning(_ pid: Int32) -> Bool {
+        if kill(pid, 0) == 0 { return true }
+        return errno == EPERM
+    }
+
+    private func presentForceQuitFailed(_ proc: Proc) {
+        guard let host = popoverWindow, host.attachedSheet == nil else { return }
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Couldn’t Force Quit \(proc.displayName)"
+        alert.informativeText = "The process is still running."
+        alert.addButton(withTitle: "OK")
+        alert.beginSheetModal(for: host, completionHandler: nil)
     }
 
     func quit() {

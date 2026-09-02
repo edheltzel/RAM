@@ -38,7 +38,6 @@ enum MemorySampler {
             wired: wired,
             compressed: compressed,
             swap: swapUsed(),
-            pressureSysctl: pressureLevel,
             pressure: PressureLevel.from(sysctl: pressureLevel),
             sampledAt: Date()
         )

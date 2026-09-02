@@ -23,13 +23,6 @@ enum PressureLevel: Equatable, Sendable {
         }
     }
 
-    var color: NSColor {
-        switch self {
-        case .normal: return .systemGreen
-        case .warning: return .systemOrange
-        case .critical: return .systemRed
-        }
-    }
 
     var segmentIndex: Int {
         switch self {
@@ -48,13 +41,12 @@ struct MemorySnapshot: Equatable, Sendable {
     var wired: UInt64
     var compressed: UInt64
     var swap: UInt64
-    var pressureSysctl: Int
     var pressure: PressureLevel
     var sampledAt: Date
 
     static let empty = MemorySnapshot(
         total: 1, used: 0, free: 1, app: 0, wired: 0, compressed: 0, swap: 0,
-        pressureSysctl: 0, pressure: .normal, sampledAt: .distantPast
+        pressure: .normal, sampledAt: .distantPast
     )
 
     /// Chip percent is (total − free) / total.
@@ -78,12 +70,9 @@ struct HistoryPoint: Equatable, Sendable {
 
 struct Proc: Identifiable, Sendable, Equatable {
     var pid: Int32
-    var ppid: Int32
     var name: String
     var path: String
-    var argv0: String
     var bytes: UInt64
-    var ttyDev: UInt32
     var bundleIdentifier: String?
 
     var id: Int32 { pid }
@@ -155,9 +144,6 @@ extension Proc {
         }
         if !path.isEmpty {
             return Self.sizedWorkspaceIcon(forFile: path)
-        }
-        if !argv0.isEmpty {
-            return Self.sizedWorkspaceIcon(forFile: argv0)
         }
         if let named = NSImage(named: NSImage.applicationIconName) {
             let copy = named.copy() as? NSImage ?? named
