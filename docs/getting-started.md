@@ -34,7 +34,7 @@ This extra does **not** request Full Disk Access or other TCC prompts.
 
 ## Launch at login
 
-Launch at login is on by default the first time RAM runs (`SMAppService`). Toggle it with the checkbox in the popup. macOS may ask once to allow the login item.
+Launch at login is off until you check it in the popup (`SMAppService`). macOS may ask once to allow the login item.
 
 If the app was built ad-hoc and never copied into `/Applications`, macOS may refuse the login item. The extra still runs when you open the `.app` yourself.
 
