@@ -112,7 +112,19 @@ struct PopupView: View {
     private var processHeader: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
+                Button {
+                    store.toggleFilter()
+                } label: {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 11, weight: .medium))
+                }
+                .buttonStyle(.plain)
+                .help(store.filterRevealed || !store.filter.isEmpty ? "Hide search" : "Show search")
+                .accessibilityLabel(store.filterRevealed || !store.filter.isEmpty ? "Hide search" : "Show search")
+
                 sectionTitle("TOP PROCESSES")
+                    .frame(maxWidth: .infinity)
+
                 Button {
                     store.cycleView()
                 } label: {
@@ -126,16 +138,6 @@ struct PopupView: View {
                 .controlSize(.mini)
                 .help("View cycles Nested → Process")
                 .accessibilityLabel("Group by \(store.listView.rawValue)")
-
-                Button {
-                    store.toggleFilter()
-                } label: {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 11, weight: .medium))
-                }
-                .buttonStyle(.plain)
-                .help(store.filterRevealed || !store.filter.isEmpty ? "Hide search" : "Show search")
-                .accessibilityLabel(store.filterRevealed || !store.filter.isEmpty ? "Hide search" : "Show search")
             }
             if store.filterRevealed || !store.filter.isEmpty {
                 filterField
@@ -169,26 +171,30 @@ struct PopupView: View {
     }
 
     private var processList: some View {
-        VStack(spacing: 0) {
-            ForEach(store.rows) { row in
-                rowView(row)
-            }
-            if store.rows.isEmpty {
-                Text(store.filter.isEmpty ? "No processes" : "No matches")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 8)
-            }
-            Spacer(minLength: 0)
-                .frame(maxWidth: .infinity)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    store.clearSelection()
+        let listHeight = CGFloat(Grouping.rowCap) * 24
+        return ScrollView(.vertical, showsIndicators: store.rows.count > Grouping.rowCap) {
+            VStack(spacing: 0) {
+                ForEach(store.rows) { row in
+                    rowView(row)
                 }
+                if store.rows.isEmpty {
+                    Text(store.filter.isEmpty ? "No processes" : "No matches")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 8)
+                }
+                Spacer(minLength: 0)
+                    .frame(maxWidth: .infinity)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        store.clearSelection()
+                    }
+            }
+            .frame(minHeight: listHeight, alignment: .top)
         }
-        // 10 capped rows: 16pt icon + 4pt vertical padding each side.
-        .frame(minHeight: CGFloat(Grouping.rowCap) * 24, alignment: .top)
+        // Viewport stays 10 rows; Nested expand can grow past the cap and scroll.
+        .frame(height: listHeight, alignment: .top)
         .clipped()
         .layoutPriority(1)
     }
