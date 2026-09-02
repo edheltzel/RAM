@@ -365,14 +365,29 @@ private struct ProcessRow: View {
     @State private var hovering = false
 
     var body: some View {
+        Group {
+            if row.expandable {
+                Button(action: onToggleExpand) { chrome }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(row.expanded ? "Collapse \(row.title)" : "Expand \(row.title)")
+            } else {
+                chrome
+                    .onTapGesture {
+                        if case .process(let pid) = row.kind {
+                            onSelectProcess(pid)
+                        }
+                    }
+            }
+        }
+        .onHover { hovering = $0 }
+    }
+
+    private var chrome: some View {
         HStack(spacing: 6) {
             if row.expandable {
-                Button(action: onToggleExpand) {
-                    Image(systemName: row.expanded ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 9, weight: .semibold))
-                        .frame(width: 10)
-                }
-                .buttonStyle(.plain)
+                Image(systemName: row.expanded ? "chevron.down" : "chevron.right")
+                    .font(.system(size: 9, weight: .semibold))
+                    .frame(width: 10)
             } else if row.depth > 0 {
                 Color.clear.frame(width: 16)
             }
@@ -398,12 +413,6 @@ private struct ProcessRow: View {
                 .fill(selected ? Color.primary.opacity(0.10) : (hovering ? Color.primary.opacity(0.06) : Color.clear))
         )
         .contentShape(Rectangle())
-        .onTapGesture {
-            if case .process(let pid) = row.kind {
-                onSelectProcess(pid)
-            }
-        }
-        .onHover { hovering = $0 }
     }
 
     @ViewBuilder
