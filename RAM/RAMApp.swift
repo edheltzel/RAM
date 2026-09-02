@@ -32,8 +32,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-/// Menu-bar extra: one gauge + percent. Color follows Stats utilization zones
-/// (systemBlue ≤60%, orange ≤80%, red above).
+/// Menu-bar extra: one gauge + percent. Color follows Stats 60/80 zones
+/// (white ≤60%, orange ≤80%, red above). Popup split colors are unchanged.
 /// MenuBarExtra templates SwiftUI labels, so rasterize original or both glyph and percent go monochrome.
 struct ChipLabel: View {
     var percent: Int
@@ -46,9 +46,9 @@ struct ChipLabel: View {
             .help("RAM \(percent)%")
     }
 
-    /// Stats `Double.usageColor` defaults: zones (0.6, 0.8), not reversed.
+    /// Chip only: white in the Stats blue zone. Orange/red unchanged.
     private static func tint(percent: Int) -> Color {
-        if percent <= 60 { return Color(nsColor: .systemBlue) }
+        if percent <= 60 { return .white }
         if percent <= 80 { return Color(nsColor: .orange) }
         return Color(nsColor: .red)
     }
