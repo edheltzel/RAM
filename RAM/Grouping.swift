@@ -51,16 +51,22 @@ enum Grouping {
         let gui = NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular }
         var claimed = Set<Int32>()
         var rows: [ListRow] = []
+        // One group per bundle identity — multiple NSRunningApplication instances of the
+        // same app must not each emit an identical parent/children set.
+        var seenIdentity = Set<String>()
 
         for app in gui {
             guard let bundleURL = app.bundleURL else { continue }
             let root = bundleURL.standardizedFileURL.path
+            let identity = app.bundleIdentifier ?? root
+            if seenIdentity.contains(identity) { continue }
+            seenIdentity.insert(identity)
             let members = processes.filter { proc in
                 !proc.path.isEmpty && proc.path.hasPrefix(root + "/")
             }
             guard !members.isEmpty else { continue }
             members.forEach { claimed.insert($0.pid) }
-            let id = "app:\(app.bundleIdentifier ?? app.localizedName ?? "\(app.processIdentifier)")"
+            let id = "app:\(identity)"
             let title = app.localizedName ?? URL(fileURLWithPath: root).deletingPathExtension().lastPathComponent
             rows.append(
                 ListRow(

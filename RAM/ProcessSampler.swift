@@ -32,7 +32,9 @@ enum ProcessSampler {
                     name: display,
                     path: path,
                     bytes: bytes,
-                    bundleIdentifier: app?.bundleIdentifier
+                    bundleIdentifier: app?.bundleIdentifier,
+                    startSec: bsd?.startSec ?? 0,
+                    startUsec: bsd?.startUsec ?? 0
                 )
             )
         }
@@ -41,6 +43,14 @@ enum ProcessSampler {
 
     private struct BSD {
         var name: String
+        var startSec: UInt64
+        var startUsec: UInt64
+    }
+
+    /// Current kernel start time for a live PID, if readable.
+    static func startTime(pid: Int32) -> (sec: UInt64, usec: UInt64)? {
+        guard let bsd = bsdInfo(pid: pid) else { return nil }
+        return (bsd.startSec, bsd.startUsec)
     }
 
     private static func allPids() -> [Int32] {
@@ -79,7 +89,7 @@ enum ProcessSampler {
         let name = withUnsafeBytes(of: info.pbi_name) { raw in
             String(cString: raw.bindMemory(to: CChar.self).baseAddress!)
         }
-        return BSD(name: name)
+        return BSD(name: name, startSec: info.pbi_start_tvsec, startUsec: info.pbi_start_tvusec)
     }
 
     private static func pidPath(pid: Int32) -> String {

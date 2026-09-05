@@ -176,13 +176,18 @@ final class Store {
 
     func performForceQuit() {
         guard let proc = forceQuitTarget else { return }
-        NSRunningApplication(processIdentifier: proc.pid)?.forceTerminate()
-        kill(proc.pid, SIGKILL)
         forceQuitTarget = nil
         selectedProcessPid = nil
+        // Refuse to signal if the PID was reused (start time no longer matches).
+        guard Self.matchesIdentity(proc) else {
+            refreshProcesses()
+            refreshMemory()
+            return
+        }
+        _ = Self.terminateMatching(proc)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
             guard let self else { return }
-            if Self.isRunning(proc.pid) {
+            if Self.matchesIdentity(proc) {
                 self.presentForceQuitFailed(proc)
             }
             self.refreshProcesses()
@@ -194,6 +199,27 @@ final class Store {
     private static func isRunning(_ pid: Int32) -> Bool {
         if kill(pid, 0) == 0 { return true }
         return errno == EPERM
+    }
+
+    /// Same PID + same kernel start time as when the row was sampled.
+    private static func matchesIdentity(_ proc: Proc) -> Bool {
+        guard isRunning(proc.pid) else { return false }
+        guard let start = ProcessSampler.startTime(pid: proc.pid) else { return false }
+        return start.sec == proc.startSec && start.usec == proc.startUsec
+    }
+
+    /// One checked terminate path: AppKit forceTerminate when available, else SIGKILL.
+    /// Re-validates identity before each signal so a replacement process is never hit.
+    @discardableResult
+    private static func terminateMatching(_ proc: Proc) -> Bool {
+        guard matchesIdentity(proc) else { return false }
+        if let app = NSRunningApplication(processIdentifier: proc.pid) {
+            if app.forceTerminate() { return true }
+            // Exited (or was replaced) during forceTerminate — treat as done.
+            if !matchesIdentity(proc) { return true }
+        }
+        guard matchesIdentity(proc) else { return false }
+        return kill(proc.pid, SIGKILL) == 0
     }
 
     private func presentForceQuitFailed(_ proc: Proc) {
@@ -212,12 +238,18 @@ final class Store {
 
     /// Type-to-filter like a menu: printable keys append, delete backs up, escape clears.
     /// Returns nil when the event is consumed so the menu extra keeps focus.
+    /// When the native search field / field editor has focus, keys pass through untouched
+    /// so selection replace and backspace work correctly.
     func handleFilterKey(_ event: NSEvent) -> NSEvent? {
         if !event.modifierFlags.intersection([.command, .control, .option]).isEmpty {
             return event
         }
         // Sheet owns keys while Force Quit is up. Do not treat Return as confirm.
-        if forceQuitTarget != nil {
+        if forceQuitTarget != nil || popoverWindow?.attachedSheet != nil {
+            return event
+        }
+        // Native text editing owns the event — do not mutate `filter` by hand.
+        if Self.isTextEditing(in: popoverWindow) {
             return event
         }
         if event.keyCode == 53 { // escape
@@ -340,6 +372,21 @@ final class Store {
                 }
             }
         )
+    }
+
+    /// True when an AppKit field editor / text field owns first responder in the popup.
+    private static func isTextEditing(in window: NSWindow?) -> Bool {
+        let keyWindow: NSWindow?
+        if let window, window.isKeyWindow {
+            keyWindow = window
+        } else {
+            keyWindow = NSApp.keyWindow
+        }
+        guard let first = keyWindow?.firstResponder else { return false }
+        if first is NSTextView || first is NSText { return true }
+        if let field = first as? NSTextField, field.currentEditor() != nil { return true }
+        if let control = first as? NSControl, control.currentEditor() != nil { return true }
+        return false
     }
 
     private func refreshProcesses() {

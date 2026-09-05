@@ -74,6 +74,9 @@ struct Proc: Identifiable, Sendable, Equatable {
     var path: String
     var bytes: UInt64
     var bundleIdentifier: String?
+    /// Kernel process start time — used so Force Quit cannot signal a reused PID.
+    var startSec: UInt64
+    var startUsec: UInt64
 
     var id: Int32 { pid }
 
