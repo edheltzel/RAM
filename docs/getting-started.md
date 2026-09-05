@@ -1,5 +1,14 @@
 # Getting started
 
+## Install from a release DMG
+
+1. Download `RAM-*.dmg` from [Releases](https://github.com/edheltzel/RAM/releases).
+2. Open the DMG and drag `RAM.app` to **Applications** (recommended).
+3. First launch: macOS may block it because the app is **ad-hoc signed** and **not notarized** (no Developer ID yet).
+   - In Finder: **right-click** `RAM.app` → **Open** → confirm, or
+   - System Settings → Privacy & Security → allow the blocked app.
+4. Gatekeeper quarantine is normal for this release. Do not expect a clean Developer ID / notarized install yet.
+
 ## Build
 
 From the repository root, with Xcode installed:
@@ -17,6 +26,8 @@ open build/Build/Products/Release/RAM.app
 ```
 
 You can also open `RAM.xcodeproj` in Xcode and Run.
+
+Local Release builds are also ad-hoc signed (`CODE_SIGN_IDENTITY="-"`), so the same Gatekeeper caveats apply if you zip or share the `.app`.
 
 ## Menu bar extra
 
