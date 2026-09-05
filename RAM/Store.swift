@@ -210,13 +210,16 @@ final class Store {
 
     /// One checked terminate path: AppKit forceTerminate when available, else SIGKILL.
     /// Re-validates identity before each signal so a replacement process is never hit.
+    /// forceTerminate() success only means the request was sent — re-check, then SIGKILL if still live.
     @discardableResult
     private static func terminateMatching(_ proc: Proc) -> Bool {
         guard matchesIdentity(proc) else { return false }
         if let app = NSRunningApplication(processIdentifier: proc.pid) {
-            if app.forceTerminate() { return true }
+            // forceTerminate returning true means the request was sent, NOT that the process died.
+            _ = app.forceTerminate()
             // Exited (or was replaced) during forceTerminate — treat as done.
             if !matchesIdentity(proc) { return true }
+            // Same identity still live — fall through to SIGKILL.
         }
         guard matchesIdentity(proc) else { return false }
         return kill(proc.pid, SIGKILL) == 0
