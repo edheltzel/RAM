@@ -112,7 +112,18 @@ struct PopupView: View {
     private var processHeader: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
+                Button {
+                    store.toggleFilter()
+                } label: {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 11, weight: .medium))
+                }
+                .buttonStyle(.plain)
+                .help(store.filterRevealed || !store.filter.isEmpty ? "Hide search" : "Show search")
+                .accessibilityLabel(store.filterRevealed || !store.filter.isEmpty ? "Hide search" : "Show search")
+
                 sectionTitle("TOP PROCESSES")
+
                 Button {
                     store.cycleView()
                 } label: {
@@ -126,16 +137,6 @@ struct PopupView: View {
                 .controlSize(.mini)
                 .help("View cycles Nested → Process")
                 .accessibilityLabel("Group by \(store.listView.rawValue)")
-
-                Button {
-                    store.toggleFilter()
-                } label: {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 11, weight: .medium))
-                }
-                .buttonStyle(.plain)
-                .help(store.filterRevealed || !store.filter.isEmpty ? "Hide search" : "Show search")
-                .accessibilityLabel(store.filterRevealed || !store.filter.isEmpty ? "Hide search" : "Show search")
             }
             if store.filterRevealed || !store.filter.isEmpty {
                 filterField
