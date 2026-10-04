@@ -139,14 +139,26 @@ enum Palette {
 }
 
 extension Proc {
+    private static var iconCache: [String: NSImage] = [:]
+
     /// 16pt icon for a process row: workspace file icon, else generic application.
+    /// Repeat lookups for the same bundle id or path reuse the cached image.
     var rowIcon: NSImage {
-        if let bundleIdentifier, !bundleIdentifier.isEmpty,
-           let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) {
-            return Self.sizedWorkspaceIcon(forFile: url.path)
+        if let bundleIdentifier, !bundleIdentifier.isEmpty {
+            let key = "bundle:\(bundleIdentifier)"
+            if let cached = Self.iconCache[key] { return cached }
+            if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) {
+                let icon = Self.sizedWorkspaceIcon(forFile: url.path)
+                Self.iconCache[key] = icon
+                return icon
+            }
         }
         if !path.isEmpty {
-            return Self.sizedWorkspaceIcon(forFile: path)
+            let key = "path:\(path)"
+            if let cached = Self.iconCache[key] { return cached }
+            let icon = Self.sizedWorkspaceIcon(forFile: path)
+            Self.iconCache[key] = icon
+            return icon
         }
         if let named = NSImage(named: NSImage.applicationIconName) {
             let copy = named.copy() as? NSImage ?? named

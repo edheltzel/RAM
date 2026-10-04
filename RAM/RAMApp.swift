@@ -60,7 +60,27 @@ struct ChipLabel: View {
     }
 
     @MainActor
+    private static var cachedPercent: Int?
+    @MainActor
+    private static var cachedPressure: PressureLevel?
+    @MainActor
+    private static var cachedImage: NSImage?
+
+    /// Rebuild only when the percent or the chip tint changes.
+    @MainActor
     static func makeImage(percent: Int, pressure: PressureLevel) -> NSImage {
+        if cachedPercent == percent, cachedPressure == pressure, let cachedImage {
+            return cachedImage
+        }
+        let image = renderedImage(percent: percent, pressure: pressure)
+        cachedPercent = percent
+        cachedPressure = pressure
+        cachedImage = image
+        return image
+    }
+
+    @MainActor
+    private static func renderedImage(percent: Int, pressure: PressureLevel) -> NSImage {
         let color = tint(percent: percent, pressure: pressure)
         let content = HStack(spacing: 4) {
             Image(systemName: "gauge.open.with.lines.needle.33percent")

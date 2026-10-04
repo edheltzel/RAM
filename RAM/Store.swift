@@ -33,6 +33,13 @@ final class Store {
     private var popupTimer: Timer?
     private var extraWindowObservers: [NSObjectProtocol] = []
     private let historyCap = 60
+    private var processSampleGeneration = 0
+
+    @ObservationIgnored
+    private weak var notedWindow: NSWindow?
+
+    @ObservationIgnored
+    private var notedWindowVisible = false
 
     init() {
         if let raw = UserDefaults.standard.string(forKey: "ram.listView"),
@@ -105,8 +112,18 @@ final class Store {
     /// and can skip onAppear on the next click. Drive open/closed from the extra window itself.
     func noteExtraWindow(_ window: NSWindow?) {
         guard let window else { return }
+        let visible = window.isVisible
+        if notedWindow === window, notedWindowVisible == visible {
+            // Identity and visibility are unchanged. A sheet can be the only reason
+            // a hidden window has not closed yet, so keep checking that case.
+            if visible || !popupOpen || isSheetBlockingDismiss(window) {
+                return
+            }
+        }
+        notedWindow = window
+        notedWindowVisible = visible
         bindExtraWindow(window)
-        if window.isVisible {
+        if visible {
             if !popupOpen {
                 popupAppeared()
             }
@@ -363,7 +380,7 @@ final class Store {
                 guard let self, self.popupOpen else { return }
                 if self.stopPopupIfWindowHidden() { return }
                 self.refreshMemory()
-                self.refreshProcesses()
+                self.sampleProcessesOffMain()
             }
         }
         popupTimer?.tolerance = 0.2
@@ -443,7 +460,25 @@ final class Store {
     }
 
     private func refreshProcesses() {
-        processes = ProcessSampler.list()
+        processSampleGeneration += 1
+        applyProcesses(ProcessSampler.list())
+    }
+
+    /// The open popup samples processes every second. Do that off the main actor.
+    private func sampleProcessesOffMain() {
+        processSampleGeneration += 1
+        let generation = processSampleGeneration
+        Task { [weak self] in
+            let sampled = await Task.detached(priority: .userInitiated) {
+                ProcessSampler.list()
+            }.value
+            guard let self, self.popupOpen, generation == self.processSampleGeneration else { return }
+            self.applyProcesses(sampled)
+        }
+    }
+
+    private func applyProcesses(_ sampled: [Proc]) {
+        processes = sampled
         if let pid = selectedProcessPid, !processes.contains(where: { $0.pid == pid }) {
             selectedProcessPid = nil
             if forceQuitTarget?.pid == pid {
