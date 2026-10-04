@@ -3,7 +3,6 @@ import AppKit
 
 struct PopupView: View {
     @Environment(Store.self) private var store
-    @State private var keyMonitor: Any?
 
     var body: some View {
         @Bindable var store = store
@@ -24,15 +23,8 @@ struct PopupView: View {
         .frame(width: 300)
         .onAppear {
             store.popupAppeared()
-            keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-                store.handleFilterKey(event)
-            }
         }
         .onDisappear {
-            if let keyMonitor {
-                NSEvent.removeMonitor(keyMonitor)
-            }
-            keyMonitor = nil
             store.popupDisappeared()
         }
     }

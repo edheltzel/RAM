@@ -23,6 +23,9 @@ final class Store {
     @ObservationIgnored
     weak var popoverWindow: NSWindow?
 
+    @ObservationIgnored
+    private var keyMonitor: Any?
+
     private var chipTimer: Timer?
     private var popupTimer: Timer?
     private var extraWindowObservers: [NSObjectProtocol] = []
@@ -61,6 +64,7 @@ final class Store {
         startPopupTimer()
         popoverWindow?.makeKey()
         NSApp.activate(ignoringOtherApps: true)
+        installKeyMonitor()
     }
 
     func popupDisappeared() {
@@ -74,7 +78,24 @@ final class Store {
         selectedProcessPid = nil
         filter = ""
         processes = []
+        removeKeyMonitor()
         // Keep popoverWindow so becomeKey can restart sampling if SwiftUI skips onAppear.
+    }
+
+
+    private func installKeyMonitor() {
+        guard keyMonitor == nil else { return }
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self else { return event }
+            return self.handleFilterKey(event)
+        }
+    }
+
+    private func removeKeyMonitor() {
+        if let keyMonitor {
+            NSEvent.removeMonitor(keyMonitor)
+        }
+        self.keyMonitor = nil
     }
 
     /// MenuBarExtra .window often keeps PopupView mounted after dismiss (onDisappear never fires)
