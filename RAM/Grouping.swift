@@ -44,9 +44,10 @@ enum Grouping {
         )
     }
 
-    /// GUI apps collapse by bundle: two Brave windows = one Brave. A process only joins an
-    /// app row if its executable lives inside that app's bundle. Terminal.app is summed that
-    /// way; shells and coding agents hosted *in* a terminal stay separate process rows.
+    /// GUI apps collapse by bundle: two Brave windows = one Brave. A process joins an
+    /// app row when its executable lives inside that bundle, or when its path is empty
+    /// and its bundle id matches. One PID is summed once. Terminal.app is summed that
+    /// way; shells and coding agents hosted in a terminal stay separate process rows.
     private static func appRows(_ processes: [Proc], nested: Bool, expanded: Set<String>, sortDescending: Bool) -> [ListRow] {
         let gui = NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular }
         var claimed = Set<Int32>()
@@ -61,8 +62,18 @@ enum Grouping {
             let identity = app.bundleIdentifier ?? root
             if seenIdentity.contains(identity) { continue }
             seenIdentity.insert(identity)
+            var seenPid = Set<Int32>()
             let members = processes.filter { proc in
-                !proc.path.isEmpty && proc.path.hasPrefix(root + "/")
+                let joins: Bool
+                if !proc.path.isEmpty {
+                    joins = proc.path.hasPrefix(root + "/")
+                } else if let bundle = proc.bundleIdentifier, !bundle.isEmpty {
+                    joins = bundle == app.bundleIdentifier
+                } else {
+                    joins = false
+                }
+                guard joins else { return false }
+                return seenPid.insert(proc.pid).inserted
             }
             guard !members.isEmpty else { continue }
             members.forEach { claimed.insert($0.pid) }
