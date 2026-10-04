@@ -4,6 +4,7 @@ import AppKit
 enum ActivityMonitorOpener {
     /// Opens Activity Monitor. Jumping to the Memory tab is AppleScript (often needs
     /// Automation TCC). We never request that permission; if the jump fails, say so.
+    /// This waits on `open` and on a short AppleScript delay, so call it off the main thread.
     @discardableResult
     static func open() -> String {
         let proc = Process()

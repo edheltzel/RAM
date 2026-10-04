@@ -159,7 +159,13 @@ final class Store {
     }
 
     func openActivityMonitor() {
-        activityMonitorNote = ActivityMonitorOpener.open()
+        Task { [weak self] in
+            let note = await Task.detached(priority: .userInitiated) {
+                ActivityMonitorOpener.open()
+            }.value
+            guard let self, self.popupOpen else { return }
+            self.activityMonitorNote = note
+        }
     }
 
     func selectProcess(pid: Int32) {
