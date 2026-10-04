@@ -169,27 +169,29 @@ struct PopupView: View {
     }
 
     private var processList: some View {
-        VStack(spacing: 0) {
-            ForEach(store.rows) { row in
-                rowView(row)
-            }
-            if store.rows.isEmpty {
-                Text(store.filter.isEmpty ? "No processes" : "No matches")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 8)
-            }
-            Spacer(minLength: 0)
-                .frame(maxWidth: .infinity)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    store.clearSelection()
+        ScrollView {
+            VStack(spacing: 0) {
+                ForEach(store.rows) { row in
+                    rowView(row)
                 }
+                if store.rows.isEmpty {
+                    Text(store.filter.isEmpty ? "No processes" : "No matches")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 8)
+                }
+                Spacer(minLength: 0)
+                    .frame(maxWidth: .infinity)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        store.clearSelection()
+                    }
+            }
+            .frame(minHeight: CGFloat(Grouping.rowCap) * 24, alignment: .top)
         }
-        // 10 capped rows: 16pt icon + 4pt vertical padding each side.
-        .frame(minHeight: CGFloat(Grouping.rowCap) * 24, alignment: .top)
-        .clipped()
+        // Ten rows stay on screen. Nested children past that scroll.
+        .frame(height: CGFloat(Grouping.rowCap) * 24)
         .layoutPriority(1)
     }
 

@@ -88,19 +88,22 @@ enum Grouping {
         return sortedRows(rows, descending: sortDescending)
     }
 
+    /// Parents stay inside the ten-row window. Expanded children are extra rows
+    /// the list scrolls to; they do not consume a parent slot.
     private static func nestedVisible(_ parents: [ListRow], filter: String) -> [ListRow] {
         let needle = filter.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         var out: [ListRow] = []
+        var parentsKept = 0
         for parent in parents {
-            if out.count >= rowCap { break }
+            if parentsKept >= rowCap { break }
             let childHits = parent.children.filter { matches($0.displayName, pid: $0.pid, filter: needle) }
             let parentHit = needle.isEmpty || matches(parent.title, pid: nil, filter: needle) || !childHits.isEmpty
             guard parentHit else { continue }
             out.append(parent)
+            parentsKept += 1
             if parent.expandable && parent.expanded {
                 let kids = needle.isEmpty ? parent.children : childHits
                 for child in kids {
-                    if out.count >= rowCap { break }
                     out.append(
                         ListRow(
                             id: "\(parent.id)/p:\(child.pid)",
