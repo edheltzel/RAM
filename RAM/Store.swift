@@ -16,6 +16,9 @@ final class Store {
     var filterRevealed = false
     var expanded: Set<String> = []
     var activityMonitorNote: String?
+
+    @ObservationIgnored
+    private var activityMonitorOpening = false
     var forceQuitTarget: Proc?
     var selectedProcessPid: Int32?
     var launchAtLogin = LaunchAtLogin.isEnabled
@@ -159,11 +162,15 @@ final class Store {
     }
 
     func openActivityMonitor() {
+        guard !activityMonitorOpening else { return }
+        activityMonitorOpening = true
         Task { [weak self] in
             let note = await Task.detached(priority: .userInitiated) {
                 ActivityMonitorOpener.open()
             }.value
-            guard let self, self.popupOpen else { return }
+            guard let self else { return }
+            self.activityMonitorOpening = false
+            guard self.popupOpen else { return }
             self.activityMonitorNote = note
         }
     }
