@@ -11,7 +11,7 @@ struct RAMApp: App {
             PopupView()
                 .environment(store)
         } label: {
-            ChipLabel(percent: store.memory.usedPercent)
+            ChipLabel(percent: store.memory.usedPercent, pressure: store.memory.pressure)
         }
         .menuBarExtraStyle(.window)
     }
@@ -32,30 +32,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-/// Menu-bar extra: one gauge + percent. Color follows Stats 60/80 zones
-/// (white ≤60%, orange ≤80%, red above). Popup split colors are unchanged.
+/// Menu-bar extra: one gauge + percent.
+/// Under 30% white, under 60% blue, and 60% or more follows memory pressure (green, orange, red).
+/// The popup gauge stays on its own pressure colors.
 /// MenuBarExtra templates SwiftUI labels, so rasterize original or both glyph and percent go monochrome.
 struct ChipLabel: View {
     var percent: Int
+    var pressure: PressureLevel
 
     var body: some View {
-        Image(nsImage: Self.makeImage(percent: percent))
+        Image(nsImage: Self.makeImage(percent: percent, pressure: pressure))
             .renderingMode(.original)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("RAM \(percent)%")
             .help("RAM \(percent)%")
     }
 
-    /// Chip only: white in the Stats blue zone. Orange/red unchanged.
-    private static func tint(percent: Int) -> Color {
-        if percent <= 60 { return .white }
-        if percent <= 80 { return Color(nsColor: .orange) }
-        return Color(nsColor: .red)
+    /// Chip only. The popup gauge is not colored from these cuts.
+    private static func tint(percent: Int, pressure: PressureLevel) -> Color {
+        if percent < 30 { return .white }
+        if percent < 60 { return .blue }
+        switch pressure {
+        case .normal: return .green
+        case .warning: return .orange
+        case .critical: return .red
+        }
     }
 
     @MainActor
-    static func makeImage(percent: Int) -> NSImage {
-        let color = tint(percent: percent)
+    static func makeImage(percent: Int, pressure: PressureLevel) -> NSImage {
+        let color = tint(percent: percent, pressure: pressure)
         let content = HStack(spacing: 4) {
             Image(systemName: "gauge.open.with.lines.needle.33percent")
                 .font(.system(size: 13, weight: .medium))
