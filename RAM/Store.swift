@@ -36,6 +36,12 @@ final class Store {
         if UserDefaults.standard.object(forKey: "ram.sortDescending") != nil {
             sortDescending = UserDefaults.standard.bool(forKey: "ram.sortDescending")
         }
+        if UserDefaults.standard.object(forKey: "ram.filterRevealed") != nil {
+            filterRevealed = UserDefaults.standard.bool(forKey: "ram.filterRevealed")
+        }
+        if let saved = UserDefaults.standard.stringArray(forKey: "ram.expanded") {
+            expanded = Set(saved)
+        }
         refreshMemory()
         startChipTimer()
         launchAtLogin = LaunchAtLogin.isEnabled
@@ -46,8 +52,6 @@ final class Store {
         popupOpen = true
         if !alreadyOpen {
             filter = ""
-            filterRevealed = false
-            expanded = []
             activityMonitorNote = nil
             forceQuitTarget = nil
             selectedProcessPid = nil
@@ -69,7 +73,6 @@ final class Store {
         forceQuitTarget = nil
         selectedProcessPid = nil
         filter = ""
-        filterRevealed = false
         processes = []
         // Keep popoverWindow so becomeKey can restart sampling if SwiftUI skips onAppear.
     }
@@ -95,11 +98,13 @@ final class Store {
         } else {
             filterRevealed = true
         }
+        saveFilterRevealed()
     }
 
     func cycleView() {
         listView = listView.next
         expanded = []
+        saveExpanded()
         selectedProcessPid = nil
         forceQuitTarget = nil
         UserDefaults.standard.set(listView.rawValue, forKey: "ram.listView")
@@ -116,6 +121,15 @@ final class Store {
         } else {
             expanded.insert(id)
         }
+        saveExpanded()
+    }
+
+    private func saveFilterRevealed() {
+        UserDefaults.standard.set(filterRevealed, forKey: "ram.filterRevealed")
+    }
+
+    private func saveExpanded() {
+        UserDefaults.standard.set(Array(expanded), forKey: "ram.expanded")
     }
 
     func setLaunchAtLogin(_ on: Bool) {
@@ -259,6 +273,7 @@ final class Store {
             if !filter.isEmpty || filterRevealed {
                 filter = ""
                 filterRevealed = false
+                saveFilterRevealed()
                 return nil
             }
             if selectedProcessPid != nil {
@@ -281,6 +296,7 @@ final class Store {
         if ch.isLetter || ch.isNumber || ch == " " || ch == "-" || ch == "." || ch == "_" {
             filter.append(ch)
             filterRevealed = true
+            saveFilterRevealed()
             selectedProcessPid = nil
             return nil
         }
